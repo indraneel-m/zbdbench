@@ -4,7 +4,7 @@ from .base import base_benches, Bench, DeviceScheduler
 from benchs.base import is_dev_zoned
 
 class Run(Bench):
-    jobname = "fio_zone_mixed"
+    jobname = "spdk_fio_zone_mixed"
 
     def __init__(self):
         pass
@@ -21,15 +21,22 @@ class Run(Bench):
         self.discard_dev(dev)
 
     def required_container_tools(self):
-        return super().required_container_tools() |  {'fio'}
+        return super().required_container_tools() |  {'spdk-fio'}
 
     def run(self, dev, container, spdk_path):
         extra = ''
         max_open_zones = 14
         output_path_prefix = "output"
+        spdk_json_path = ''
+        devname = dev
 
-        if container == 'no':
-            output_path_prefix = self.output
+        if spdk_path is not None:
+            spdk_json_path = ("--spdk_json_conf=%s/examples/bdev/fio_plugin/bdev_zoned_uring.json") % spdk_path
+            if container == 'yes':
+                output_path_prefix = "/" + output_path_prefix
+            else:
+                output_path_prefix = self.output
+                devname = "bdev_nvme"
 
         if is_dev_zoned(dev):
             # Zone Capacity (52% of zone size)
@@ -41,12 +48,13 @@ class Run(Bench):
 
         io_size = int(((self.get_dev_size(dev) * zonecap) / 100) * 2)
 
-        init_param = ("--ioengine=io_uring --direct=1 --zonemode=zbd"
+        init_param = ("--filename=%s"
+                    " --ioengine=%s/build/fio/spdk_bdev --direct=1 --zonemode=zbd"
+                    " --thread=1"
                     " --output-format=json"
                     " --max_open_zones=%s"
-                    " --filename=%s "
                     " --rw=randwrite --bs=16k --iodepth=8"
-                    " %s") % (max_open_zones, dev, extra)
+                    " %s %s") % (devname, spdk_path, max_open_zones, extra, spdk_json_path)
 
         prep_param = ("--name=prep "
                     " --io_size=%sk"
@@ -56,10 +64,12 @@ class Run(Bench):
         for s in [25, 50, 75, 100, 125, 150, 175, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
             mixs_param += ("--name=mix_%s_w --wait_for_previous --rate=%sm --iodepth=8 --bs=16k --runtime=180 --time_based"
                 " --name=mix_%s_r --rw=randread --bs=4k --runtime=180 --ramp_time=30 --time_based --significant_figures=6 --percentile_list=1:5:10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:100 ") % (s, s, s)
-
         fio_param = "%s %s %s" % (init_param, prep_param, mixs_param)
 
-        self.run_cmd(dev, container, 'fio', fio_param)
+        if container == 'yes':
+            fio_param = '"' + fio_param + '"'
+
+        self.run_cmd(dev, container, 'spdk-fio', fio_param)
 
     def teardown(self, dev, container):
         pass

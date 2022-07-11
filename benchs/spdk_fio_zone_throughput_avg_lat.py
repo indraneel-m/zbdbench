@@ -164,7 +164,7 @@ class BenchPlot(Plot):
         self.saveInOutputDir(filename)
 
 class Run(Bench):
-    jobname = "fio_zone_throughput_avg_lat"
+    jobname = "spdk_fio_zone_throughput_avg_lat"
 
     def __init__(self):
         pass
@@ -181,17 +181,22 @@ class Run(Bench):
         self.discard_dev(dev)
 
     def required_container_tools(self):
-        return super().required_container_tools() |  {'fio'}
+        return super().required_container_tools() |  {'spdk-fio'}
 
     def run(self, dev, container, spdk_path):
         global fio_runtime
         global fio_ramptime
         extra = ''
         output_path_prefix = "output"
+        devname = dev
 
-        if container == 'no':
-            output_path_prefix = self.output
-
+        if spdk_path is not None:
+            spdk_json_path = ("--spdk_json_conf=%s/examples/bdev/fio_plugin/bdev_zoned_uring.json") % spdk_path
+            if container == 'yes':
+                output_path_prefix = "/" + output_path_prefix
+            else:
+                output_path_prefix = self.output
+                devname = "bdev_nvme"
 
         if not is_dev_zoned(dev):
             print("This test is meant to be run on a zoned dev")
@@ -220,12 +225,13 @@ class Run(Bench):
                 extra = ''
                 print("About to prep the drive for read job")
                 self.discard_dev(dev)
-                init_param = ("--ioengine=psync --direct=1 --zonemode=zbd"
+                init_param = ("--filename=%s"
+                            " --ioengine=%s/build/fio/spdk_bdev --direct=1 --zonemode=zbd"
+                            " --thread=1"
                             " --output-format=json"
-                            " --filename=%s "
                             " --offset_increment=%sz --job_max_open_zone=1 --max_open_zones=%s --numjobs=%s --group_reporting"
                             " --rw=write --bs=128K"
-                            " %s") %  (dev, increment_size, dev_max_open_zones, str(int(number_prep_jobs)), extra)
+                            " %s %s") %  (devname, spdk_path, increment_size, dev_max_open_zones, str(int(number_prep_jobs)), extra, spdk_json_path)
 
                 prep_param = ("--name=prep "
                             " --size=%sz"
@@ -233,7 +239,10 @@ class Run(Bench):
 
                 fio_param = "%s %s" % (init_param, prep_param)
 
-                self.run_cmd(dev, container, 'fio', fio_param)
+                if container == 'yes':
+                    fio_param = '"' + fio_param + '"'
+
+                self.run_cmd(dev, container, 'spdk-fio', fio_param)
                 print("Finished preping the drive")
 
             for number_parallel_jobs in tmp_number_parallel_jobs_list:
@@ -254,26 +263,28 @@ class Run(Bench):
                             extra = ''
                             output_name = ("%s-%s-%s-%s-%s-%sof%s") % (operation, number_parallel_jobs, queue_depth, block_size, self.jobname, run, runs)
 
-                            ioengine = "io_uring"
+#                            ioengine = "io_uring"
+                            ioengine = "%s/build/fio/spdk_bdev" % spdk_path
 
                             extra = " --iodepth=%s " % queue_depth
                             if "randread" == operation:
                                 fio_runtime = "15"
 
                             if "write" == operation or "read" == operation:
-                                ioengine = "psync"
+#                                ioengine = "psync"
                                 extra = " --offset_increment=%s --numjobs=%s --group_reporting "  % (size, queue_depth)
 
                             print("About to start job %s" % output_name)
                             if "write" in operation:
                                 self.discard_dev(dev)
 
-                            init_param = ("--ioengine=%s --direct=1 --zonemode=zbd"
+                            init_param = ("--filename=%s"
+                                        " --ioengine=%s --direct=1 --zonemode=zbd"
+                                        " --thread=1"
                                         " --output-format=json"
                                         " --max_open_zones=%s"
-                                        " --filename=%s"
                                         " --rw=%s --bs=%s"
-                                        " %s") % (ioengine, dev_max_open_zones, dev, operation, block_size, extra)
+                                        " %s %s") % (devname, ioengine, dev_max_open_zones, operation, block_size, extra, spdk_json_path)
 
                             exec_param = ("--name=%s "
                                         " --size=%s"
@@ -283,7 +294,10 @@ class Run(Bench):
                                         " --output %s/%s.log") % (operation, size, fio_ramptime, fio_runtime, output_path_prefix, output_name)
                             fio_param = "%s %s" % (init_param, exec_param)
 
-                            self.run_cmd(dev, container, 'fio', fio_param)
+                            if container == 'yes':
+                                fio_param = '"' + fio_param + '"'
+
+                            self.run_cmd(dev, container, 'spdk-fio', fio_param)
                             print("Finished job")
 
     def teardown(self, dev, container):
@@ -466,7 +480,7 @@ class Run(Bench):
                 for queue_depth in tmp_queue_depth_list:
                     plot.generatePercentileGraph({"operation": operation, "block_size_K": block_size_K, "queue_depth": str(queue_depth)})
 
-        print("  Done generateing graphs")
+        print("  Done generating graphs")
 
 base_benches.append(Run())
 

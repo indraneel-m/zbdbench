@@ -25,7 +25,7 @@ validating that it is about to write to a block device, not mounted, and ready.
 
 After all benchmarks have run, their output is availble in:
 
-    output/YYYYMMDDHHMMSS (date format is replaced with the current time)
+    zbdbench_results/YYYYMMDDHHMMSS (date format is replaced with the current time)
 
 Each benchmark has a report function, which creates a csv file with the
 specific output. See the section below for the csv format for each benchmark.
@@ -37,8 +37,9 @@ To execute the benchmarks, run:
 If you have the latest fio installed, you may skip the container installation and
 run the benchmarks using the system commands.
 
-    sudo ./run.py -d /dev/nvmeXnY -c system
+    sudo ./run.py -d /dev/nvmeXnY -c no
 
+NOTE: If -c option is not not provided, default is '-c yes'.
 To list available benchmarks, run:
 
     ./run.py -l
@@ -58,17 +59,23 @@ Run specific benchmark:
 
     ./run.py -b benchmark -d /dev/nvmeXnY
 
+NOTE: To run SPDK based benchmarks (spdk_xxx) in non-container environment('-c no'), add '-s /path/to/spdk/folder'
+option(spdk should be build with '--with-uring --with-uring-zns' options) to the cmdline. Also, sample json 
+file provided in recipes/docker/spdk can be used(copy it to /path/to/spdk/folder/examples/bdev/fio_plugin/).
+For SPDK based benchmarks in container environment('-c yes'), run like other fio based benchmarks(no special 
+cmdline options needed).
+
 Run all benchmarks:
 
     ./run.py -d /dev/nvmeXnY
 
 Regenerate a report (and its plots)
 
-    ./run.py -b fio_zone_mixed -r output/YYYYMMDDHHMMSS
+    ./run.py -b fio_zone_mixed -r zbdbench_results/YYYYMMDDHHMMSS
 
 Regenerate plots from existing csv report
 
-    ./run.py -b fio_zone_throughput_avg_lat -p output/YYYYMMDDHHMMSS/fio_zone_throughput_avg_lat.csv
+    ./run.py -b fio_zone_throughput_avg_lat -p zbdbench_results/YYYYMMDDHHMMSS/fio_zone_throughput_avg_lat.csv
 
 Overwrite benchmark run with the none device scheduler:
 

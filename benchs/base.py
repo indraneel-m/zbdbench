@@ -44,7 +44,7 @@ class Bench(object):
 
     # Helpers
     def container_sys_cmd(self, dev, extra_params):
-        return f"podman run -v \"{dev}:{dev}\" -v \"{self.output}:/output\" {extra_params}"
+        return f"podman run --security-opt unmask=/sys/dev/block -v \"{dev}:{dev}\" -v \"{self.output}:/output\" {extra_params}"
 
     def required_host_tools(self):
         return {'blkzone', 'blkdiscard'}
@@ -59,6 +59,11 @@ class Bench(object):
         if container == 'yes':
             if tool == 'fio':
                 exec_cmd = 'zfio'
+                extra_container_params = ' --privileged '
+            if tool == 'spdk-fio':
+                # If spdk_x_x benchmark, launch the spdk container
+                exec_cmd = 'zspdk-fio'
+                extra_container_params = ' --privileged -v "/dev/hugepages:/dev/hugepages" -v "/dev/shm:/dev/shm" -v "/var/tmp:/var/tmp" -v "/lib/modules:/lib/modules" '
             if tool == 'db_bench':
                 exec_cmd = 'zrocksdb'
             if tool == 'zenfs':
@@ -69,6 +74,11 @@ class Bench(object):
                 exec_cmd = 'zxfs'
 
             container_cmd = self.container_sys_cmd(dev, extra_container_params)
+        else:
+            #If the env is non-containerised, we will use spdk via the fio plugin. So launch fio.
+            if tool == 'spdk-fio':
+                exec_cmd = 'fio'
+
 
         return f"{container_cmd} {exec_cmd}"
 
@@ -126,8 +136,8 @@ class Bench(object):
 
         return sectorsize
 
-    def get_nvme_drive_capacity_gb(self, path):
-        if is_dev_zoned(path):
+    def get_nvme_drive_capacity_gb(self, dev, path):
+        if is_dev_zoned(dev):
             filename = path + "/blkzone-capacity.txt"
             with open(filename, 'r') as f:
                 size_blocks = int(f.read().strip(), 0)

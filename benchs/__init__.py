@@ -1,1 +1,1 @@
-__all__ = ["base", "fio_zone_throughput_avg_lat", "fio_zone_writes", "fio_zone_mixed", "fio_zone_randr_seqw_seqr_rrsw", "rocksdb", "usenix_atc_2021_zns_eval"]
+__all__ = ["base", "fio_zone_throughput_avg_lat", "fio_zone_writes", "fio_zone_mixed", "fio_zone_randr_seqw_seqr_rrsw", "rocksdb", "usenix_atc_2021_zns_eval", "spdk_fio_zone_throughput_avg_lat", "spdk_fio_zone_writes", "spdk_fio_zone_mixed", "spdk_fio_zone_randr_seqw_seqr_rrsw"]

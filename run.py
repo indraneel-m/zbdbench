@@ -135,7 +135,7 @@ def check_and_set_scheduler_for_benchmark(dev, benchmark, scheduler_overwrite):
     else:
         check_and_set_none_scheduler(dev)
 
-def run_benchmarks(dev, container, benches, run_output, scheduler_overwrite):
+def run_benchmarks(dev, container, benches, run_output, scheduler_overwrite, spdk_path):
     if not dev:
         print('No device name provided for benchmark')
         print('ex. run.py /dev/nvmeXnY')
@@ -161,9 +161,9 @@ def run_benchmarks(dev, container, benches, run_output, scheduler_overwrite):
         print("Executing: %s" % b.id())
         check_and_set_scheduler_for_benchmark(dev, b, scheduler_overwrite)
         b.setup(dev, container, run_output)
-        b.run(dev, container)
+        b.run(dev, container, spdk_path)
         b.teardown(dev, container)
-        csv_file = b.report(run_output)
+        csv_file = b.report(dev, run_output)
         b.plot(csv_file)
 
     print("\nCompleted %s benchmark(s)" % len(benches))
@@ -217,6 +217,7 @@ def main(argv):
     parser.add_argument('--container', '-c', type=str, default='yes', choices=['yes', 'no'], help='Use containerized binaries or system binaries')
     parser.add_argument('--benchmarks', '-b', type=str, nargs='+', metavar='NAME', help='Benchmarks to run')
     parser.add_argument('--output', '-o', type=str, default=os.path.join(os.getcwd(), 'zbdbench_results'), help='Directory to place results. Will be created if it does not exist')
+    parser.add_argument('--spdk-path', '-s', type=str, help='SPDK directory path. Needed only for SPDK related benchmarks')
     scheduler_group = parser.add_mutually_exclusive_group(required=False)
     scheduler_group.add_argument('--none-scheduler', action='store_true', help='Use none scheduler for the given drive.')
     scheduler_group.add_argument('--mq-deadline-scheduler', action='store_true', help='Use mq-deadline scheduler for the given drive.')
@@ -228,6 +229,8 @@ def main(argv):
     benches = base_benches
     run = ''
     scheduler_overwrite = None
+    #default spdk bin path for containerised env
+    spdk_path = '/root/spdk_bin'
 
     if args.help:
         parser.print_help()
@@ -263,6 +266,18 @@ def main(argv):
                 print(f"Invalid benchmark name: {name}")
                 list_benchs(base_benches)
                 sys.exit(1)
+            else:
+                p = re.search("spdk", name)
+                if p:
+                    if args.spdk_path is not None:
+                        spdk_path = (args.spdk_path).rstrip('/')
+                        print(f"SPDK Directory: {spdk_path}")
+                    else:
+                        if container != 'yes':
+                            print("SPDK Directory not provided")
+                            sys.exit()
+                else:
+                    spdk_path = ''
 
         benches = [x for x in base_benches if x.id() in args.benchmarks]
         if len(benches) == 0:
@@ -279,7 +294,7 @@ def main(argv):
     elif run == 'report':
         run_reports(report_path, benches)
     elif run == 'bench':
-        run_benchmarks(dev, container, benches, run_output, scheduler_overwrite)
+        run_benchmarks(dev, container, benches, run_output, scheduler_overwrite, spdk_path)
     else:
         print_help()
 

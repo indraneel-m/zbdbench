@@ -27,7 +27,7 @@ class Run(Bench):
     def required_container_tools(self):
         return super().required_container_tools() |  {'some_tool'}
 
-    def run(self, dev, container):
+    def run(self, dev, container, spdk_path):
         bdev = self.sys_container_dev(dev, container)
         fio_params = "fio_params"
         self.run_cmd(dev, container, 'fio', fio_param)
@@ -35,7 +35,7 @@ class Run(Bench):
     def teardown(self, dev, container):
         pass
 
-    def report(self):
+    def report(self, dev, path):
         # return csv_file
         pass
 

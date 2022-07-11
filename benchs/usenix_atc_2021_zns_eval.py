@@ -258,7 +258,7 @@ class Run(Bench):
         else:
             return self.conventional_filesystems
 
-    def run(self, dev, container):
+    def run(self, dev, container, spdk_path):
         root_output = self.output
         is_device_zoned = is_dev_zoned(dev)
         for filesystem in self.get_filesystems_to_test(is_device_zoned):
@@ -287,7 +287,7 @@ class Run(Bench):
 
         self.output = root_output
 
-    def report(self, path):
+    def report(self, dev, path):
         csv_files = []
         is_device_zoned = os.path.exists(os.path.join(path, "zenfs"))
         subpaths = self.get_filesystems_to_test(is_device_zoned)
